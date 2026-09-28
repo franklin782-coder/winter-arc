@@ -1,0 +1,66 @@
+{
+  "meta": {
+    "title": "Winter Arc",
+    "owner": "",
+    "sample": false,
+    "startDate": "2026-09-28",
+    "durationDays": 30,
+    "longTermEndDate": "2027-03-28",
+    "timezone": "Asia/Almaty",
+    "lastUpdated": "2026-09-28T23:55:00+05:00"
+  },
+  "profile": {
+    "age": 23,
+    "heightCm": 186
+  },
+  "targets": {
+    "calories": 2000,
+    "maintenanceCalories": 2890,
+    "protein": null,
+    "fat": null,
+    "carbs": null,
+    "workHoursPerDay": null,
+    "workHoursPerWeek": null,
+    "startWeight": 105,
+    "goalWeight": 98.5,
+    "goalWeightDate": "2026-10-28",
+    "goalLabel": "−6–7 кг"
+  },
+  "habits": [
+    {
+      "id": "morning",
+      "name": "Зарядка утром",
+      "emoji": "🤸",
+      "note": "минимум 10 минут, 1 раз в день"
+    },
+    {
+      "id": "active4x10",
+      "name": "Активность 4×10 мин",
+      "emoji": "🚶",
+      "target": 4,
+      "note": "10 минут активности, 4 раза в день"
+    }
+  ],
+  "exercises": [],
+  "goals": {
+    "month": [
+      {
+        "id": "m-weight",
+        "title": "Сбросить 6–7 кг к 28 октября (до ~98,5 кг)",
+        "category": "Спорт",
+        "start": 105,
+        "current": 105,
+        "target": 98.5,
+        "unit": "кг",
+        "auto": "weight",
+        "deadline": "2026-10-28"
+      }
+    ],
+    "sixMonth": []
+  },
+  "days": {
+    "2026-09-28": {
+      "weight": 105
+    }
+  }
+}

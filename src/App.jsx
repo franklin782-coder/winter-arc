@@ -1,0 +1,98 @@
+import React, { useEffect, useState } from 'react';
+import { LayoutDashboard, Target, ListChecks, Flame, Briefcase, Dumbbell, Apple, Snowflake } from 'lucide-react';
+import { buildModel, fmtLong } from './lib.js';
+import Overview from './tabs/Overview.jsx';
+import Goals from './tabs/Goals.jsx';
+import Tasks from './tabs/Tasks.jsx';
+import Habits from './tabs/Habits.jsx';
+import Work from './tabs/Work.jsx';
+import Sport from './tabs/Sport.jsx';
+import Nutrition from './tabs/Nutrition.jsx';
+
+const TABS = [
+  { id: 'overview', label: 'Обзор', icon: LayoutDashboard, C: Overview },
+  { id: 'goals', label: 'Цели', icon: Target, C: Goals },
+  { id: 'tasks', label: 'Задачи', icon: ListChecks, C: Tasks },
+  { id: 'habits', label: 'Привычки', icon: Flame, C: Habits },
+  { id: 'work', label: 'Работа', icon: Briefcase, C: Work },
+  { id: 'sport', label: 'Спорт', icon: Dumbbell, C: Sport },
+  { id: 'nutrition', label: 'Питание', icon: Apple, C: Nutrition },
+];
+
+const tabFromHash = () => {
+  const h = window.location.hash.replace(/^#\/?/, '');
+  return TABS.some((t) => t.id === h) ? h : 'overview';
+};
+
+export default function App() {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+  const [tab, setTab] = useState(tabFromHash());
+
+  useEffect(() => {
+    fetch(`./data/data.json?v=${Date.now()}`, { cache: 'no-store' })
+      .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then(setData)
+      .catch((e) => setError(e.message));
+    const onHash = () => { setTab(tabFromHash()); window.scrollTo({ top: 0 }); };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  if (error) return <div className="p-8 text-rose-300">Не удалось загрузить data/data.json: {error}</div>;
+  if (!data) return <div className="min-h-screen flex items-center justify-center text-slate-400"><Snowflake className="animate-spin mr-2" size={18} /> Загрузка…</div>;
+
+  const model = buildModel(data);
+  const { meta } = data;
+  const Active = TABS.find((t) => t.id === tab).C;
+  const dayLabel = model.dayNum < 1 ? `Старт через ${1 - model.dayNum} дн.` : model.dayNum > meta.durationDays ? `Арка завершена` : `День ${model.dayNum} из ${meta.durationDays}`;
+
+  return (
+    <div className="min-h-screen pb-24 md:pb-10">
+      <header className="sticky top-0 z-30 backdrop-blur-xl bg-[#070b14]/75 border-b border-white/[.06]">
+        <div className="max-w-7xl mx-auto px-4 h-14 md:h-16 flex items-center gap-4">
+          <a href="#/overview" className="flex items-center gap-2 shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-500 flex items-center justify-center shadow-lg shadow-sky-500/20">
+              <Snowflake size={18} className="text-white" />
+            </div>
+            <div className="leading-tight">
+              <div className="font-semibold text-white tracking-tight">{meta.title}</div>
+              <div className="text-[11px] text-slate-400 -mt-0.5">{dayLabel}</div>
+            </div>
+          </a>
+          <nav className="hidden md:flex items-center gap-1 ml-4 overflow-x-auto no-scrollbar">
+            {TABS.map((t) => (
+              <a key={t.id} href={`#/${t.id}`}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition whitespace-nowrap ${tab === t.id ? 'bg-white/[.08] text-white' : 'text-slate-400 hover:text-slate-100 hover:bg-white/[.04]'}`}>
+                <t.icon size={16} className={tab === t.id ? 'text-sky-400' : ''} />{t.label}
+              </a>
+            ))}
+          </nav>
+          <div className="ml-auto text-right text-xs text-slate-400 hidden lg:block">
+            <div className="text-slate-300">{fmtLong(model.today)}</div>
+            <div>Алматы</div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 pt-5 md:pt-8">
+        <Active data={data} model={model} />
+        <footer className="mt-10 text-center text-xs text-slate-600">
+          Обновлено: {meta.lastUpdated ? new Date(meta.lastUpdated).toLocaleString('ru-RU', { timeZone: 'Asia/Almaty', dateStyle: 'medium', timeStyle: 'short' }) : '—'} · Winter Arc ❄️
+        </footer>
+      </main>
+
+      {/* Нижняя навигация для телефона */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[#0a101d]/90 backdrop-blur-xl border-t border-white/[.08] pb-[env(safe-area-inset-bottom)]">
+        <div className="grid grid-cols-7">
+          {TABS.map((t) => (
+            <a key={t.id} href={`#/${t.id}`} className={`flex flex-col items-center gap-0.5 py-2 text-[10px] ${tab === t.id ? 'text-sky-300' : 'text-slate-500'}`}>
+              <t.icon size={20} />
+              <span className="truncate max-w-full">{t.label}</span>
+            </a>
+          ))}
+        </div>
+      </nav>
+    </div>
+  );
+}

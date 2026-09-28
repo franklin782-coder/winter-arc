@@ -1,0 +1,264 @@
+import React from 'react';
+import { AreaChart, Area, ComposedChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, Bar as RBar, ReferenceLine, Cell } from 'recharts';
+import { Scale, Flame, ListChecks, Briefcase, Trophy, CheckCircle2, Circle, Snowflake, Utensils, TrendingDown, Goal } from 'lucide-react';
+import { Card, CardTitle, Ring, Bar, Delta, ChartTooltip, Empty } from '../components/ui.jsx';
+import { fmtNum, fmtShort, fmtLong, dayNutrition, dayTasks, dayHabits, habitStreak, exerciseSeries, latestWeight, pct, arcWeek, plural, addDays, weekday, diffDays, habitDone, habitFrac, weightGoal } from '../lib.js';
+
+function dayScore(day, habits) {
+  const t = dayTasks(day).pct, h = dayHabits(day, habits).pct;
+  const v = [t, h].filter((x) => x != null);
+  return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+}
+const avg = (a) => { const v = a.filter((x) => x != null); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : 0; };
+
+export default function Overview({ data, model }) {
+  const { targets, habits, meta } = data;
+  const today = model.get(model.today) || {};
+  const n = dayNutrition(today);
+  const t = dayTasks(today);
+  const w = latestWeight(data, model);
+  const week = arcWeek(data, model.today);
+  const weekDates = model.elapsed.filter((d) => arcWeek(data, d) === week);
+  const weekScore = avg(weekDates.map((d) => dayScore(model.get(d), habits)));
+  const monthScore = avg(model.elapsed.map((d) => dayScore(model.get(d), habits)));
+  const arcPct = pct(Math.min(model.dayNum, meta.durationDays), meta.durationDays);
+
+  const weightSeries = model.elapsed.map((d) => ({ label: fmtShort(d), weight: model.get(d)?.weight ?? null })).filter((x) => x.weight != null);
+  const prevWeight = weightSeries.length > 1 ? weightSeries[weightSeries.length - 2].weight : null;
+  const kcalSeries = model.elapsed.slice(-7).map((d) => ({ label: weekday(d), kcal: dayNutrition(model.get(d))?.kcal ?? 0 }));
+  const hasKcal = kcalSeries.some((x) => x.kcal > 0);
+  const kcalTarget = targets.calories ?? null;
+  const g = weightGoal(data, model);
+  // Ось графика веса: от старта до даты цели (или до сегодня), план — прямая от стартового веса к цели
+  const chartEnd = [g?.date, model.today, model.allDates[model.allDates.length - 1]].filter(Boolean).sort().pop();
+  const planDays = Math.max(1, diffDays(meta.startDate, g?.date || chartEnd));
+  const weightChart = Array.from({ length: Math.max(1, diffDays(meta.startDate, chartEnd) + 1) }, (_, i) => {
+    const d = addDays(meta.startDate, i);
+    const wt = d <= model.today ? model.get(d)?.weight ?? null : null;
+    const plan = g ? +(g.start - (g.start - g.goal) * Math.min(1, i / planDays)).toFixed(2) : null;
+    return { label: fmtShort(d), weight: wt, plan };
+  });
+
+  const prs = data.exercises.map((ex) => {
+    const s = exerciseSeries(data, ex).filter((x) => x.date <= model.today);
+    if (!s.length) return null;
+    const best = Math.max(...s.map((x) => x.best));
+    return { ex, best, first: s[0].best };
+  }).filter(Boolean);
+
+  const workToday = today.work?.hours ?? 0;
+
+  return (
+    <div className="space-y-4 md:space-y-5">
+      {/* Hero */}
+      <Card className="relative overflow-hidden !p-5 sm:!p-7">
+        <div className="absolute -right-10 -top-10 opacity-[.06] pointer-events-none"><Snowflake size={260} /></div>
+        <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+          <div className="flex-1 min-w-0">
+            <div className="text-sky-300/90 text-sm font-medium">{fmtLong(model.today)}</div>
+            <h1 className="mt-1 text-3xl sm:text-5xl font-semibold text-white tracking-tight">
+              День {Math.max(0, Math.min(model.dayNum, meta.durationDays))} <span className="text-slate-500">из {meta.durationDays}</span>
+            </h1>
+            <p className="text-slate-400 mt-2 text-sm">Неделя {week} · осталось {Math.max(0, meta.durationDays - model.dayNum)} {plural(Math.max(0, meta.durationDays - model.dayNum), 'день', 'дня', 'дней')} до конца месяца</p>
+            <div className="mt-4 max-w-xl">
+              <Bar value={arcPct} className="h-2.5" />
+              <div className="flex justify-between text-[11px] text-slate-500 mt-1.5"><span>{fmtShort(meta.startDate)}</span><span>{fmtShort(addDays(meta.startDate, meta.durationDays - 1))}</span></div>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3 sm:gap-6">
+            {[
+              { v: arcPct, label: 'Арка', color: '#38bdf8' },
+              { v: weekScore, label: 'Неделя', color: '#a78bfa' },
+              { v: monthScore, label: 'Месяц', color: '#34d399' },
+            ].map((r) => (
+              <div key={r.label} className="flex flex-col items-center gap-2">
+                <Ring value={r.v} color={r.color} size={92}>
+                  <span className="text-lg font-semibold text-white tabular-nums">{Math.round(r.v)}%</span>
+                </Ring>
+                <span className="text-xs text-slate-400">{r.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Card>
+
+      {/* KPI */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        <Card>
+          <div className="card-title"><Scale size={16} className="text-sky-400" />Вес</div>
+          <div className="flex items-baseline gap-1 mt-2">
+            <span className="text-2xl sm:text-3xl font-semibold text-white tabular-nums">{fmtNum(w?.value, 1)}</span><span className="text-sm text-slate-400">кг</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5 mt-1.5">
+            <Delta value={w && prevWeight != null ? w.value - prevWeight : null} unit=" кг за день" invert />
+            {targets.startWeight != null && <Delta value={w ? w.value - targets.startWeight : null} unit=" от старта" invert />}
+          </div>
+          {weightSeries.length > 1 ? (
+            <div className="h-10 mt-2 -mx-1">
+              <ResponsiveContainer><AreaChart data={weightSeries}>
+                <defs><linearGradient id="wg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#38bdf8" stopOpacity=".4" /><stop offset="100%" stopColor="#38bdf8" stopOpacity="0" /></linearGradient></defs>
+                <YAxis hide domain={['dataMin - 0.3', 'dataMax + 0.3']} />
+                <Area dataKey="weight" stroke="#38bdf8" strokeWidth={2} fill="url(#wg)" dot={false} isAnimationActive={false} />
+              </AreaChart></ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="text-xs text-slate-400 mt-3">{g ? <>цель <span className="text-slate-200">{fmtNum(g.goal, 1)} кг</span> · осталось {fmtNum(Math.max(0, g.left), 1)} кг</> : 'цель по весу не задана'}</div>
+          )}
+        </Card>
+
+        <Card>
+          <div className="card-title"><Flame size={16} className="text-orange-400" />Калории</div>
+          <div className="flex items-center gap-3 mt-2">
+            <Ring value={pct(n?.kcal || 0, kcalTarget)} size={64} stroke={7} color={kcalTarget && (n?.kcal || 0) > kcalTarget * 1.05 ? '#fb7185' : '#fb923c'}>
+              <span className="text-xs font-semibold text-white">{kcalTarget ? `${Math.round(pct(n?.kcal || 0, kcalTarget))}%` : '—'}</span>
+            </Ring>
+            <div className="min-w-0">
+              <div className="text-xl sm:text-2xl font-semibold text-white tabular-nums">{fmtNum(n?.kcal ?? 0)}</div>
+              <div className="text-xs text-slate-400">{kcalTarget ? `из ${fmtNum(kcalTarget)} ккал` : 'цель не задана'}</div>
+            </div>
+          </div>
+          <div className="text-xs text-slate-400 mt-3">{n ? `Б ${fmtNum(n.protein)} · Ж ${fmtNum(n.fat)} · У ${fmtNum(n.carbs)} г` : targets.maintenanceCalories ? `поддержание ≈ ${fmtNum(targets.maintenanceCalories)} ккал` : 'еда сегодня не записана'}</div>
+        </Card>
+
+        <Card>
+          <div className="card-title"><ListChecks size={16} className="text-violet-400" />Задачи сегодня</div>
+          <div className="flex items-baseline gap-1 mt-2">
+            <span className="text-2xl sm:text-3xl font-semibold text-white tabular-nums">{t.done}</span><span className="text-sm text-slate-400">/ {t.total}</span>
+          </div>
+          <Bar value={t.pct || 0} color="from-violet-400 to-fuchsia-400" className="h-2 mt-3" />
+          <div className="text-xs text-slate-400 mt-2">{t.total ? `${Math.round(t.pct || 0)}% выполнено` : 'задач на сегодня нет'}</div>
+        </Card>
+
+        <Card>
+          <div className="card-title"><Briefcase size={16} className="text-emerald-400" />Работа сегодня</div>
+          <div className="flex items-baseline gap-1 mt-2">
+            <span className="text-2xl sm:text-3xl font-semibold text-white tabular-nums">{fmtNum(workToday, 1)}</span><span className="text-sm text-slate-400">ч</span>
+          </div>
+          <Bar value={pct(workToday, targets.workHoursPerDay)} color="from-emerald-400 to-teal-400" className="h-2 mt-3" />
+          <div className="text-xs text-slate-400 mt-2 truncate">{targets.workHoursPerDay ? `цель ${targets.workHoursPerDay} ч` : 'цель не задана'} · {today.work?.notes || 'нет записей'}</div>
+        </Card>
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-3 md:gap-4">
+        {/* Habits streaks */}
+        <Card className="lg:col-span-1">
+          <CardTitle icon={Flame} color="text-orange-400" right={<span className="text-xs text-slate-500">{dayHabits(today, habits).done}/{habits.length} сегодня</span>}>Привычки и стрики</CardTitle>
+          <div className="space-y-2">
+            {habits.map((h) => {
+              const v = today.habits?.[h.id];
+              const done = habitDone(h, v);
+              const s = habitStreak(data, model, h.id);
+              return (
+                <div key={h.id} className="flex items-center gap-3 rounded-xl px-3 py-2 bg-white/[.03]">
+                  <span className="text-lg w-6 text-center">{h.emoji}</span>
+                  <span className="flex-1 min-w-0">
+                    <span className={`block text-sm truncate ${done ? 'text-slate-100' : 'text-slate-300'}`}>{h.name}</span>
+                    {h.note && <span className="block text-[11px] text-slate-500 truncate">{h.note}</span>}
+                  </span>
+                  {h.target && <span className="text-xs tabular-nums text-slate-300">{Number(v) || 0}/{h.target}</span>}
+                  <span className={`chip ${s >= 3 ? 'bg-orange-500/15 text-orange-300' : 'bg-white/5 text-slate-400'}`}>🔥 {s}</span>
+                  {done ? <CheckCircle2 size={18} className="text-emerald-400" /> : <Circle size={18} className="text-slate-600" />}
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+
+        {/* Today tasks */}
+        <Card>
+          <CardTitle icon={ListChecks} color="text-violet-400" right={<a href="#/tasks" className="text-xs text-sky-400 hover:underline">Все задачи →</a>}>Задачи на сегодня</CardTitle>
+          <ul className="space-y-1.5">
+            {(today.tasks || []).map((task, i) => (
+              <li key={i} className="flex items-center gap-3 text-sm px-1 py-1.5">
+                {task.done ? <CheckCircle2 size={18} className="text-violet-400 shrink-0" /> : <Circle size={18} className="text-slate-600 shrink-0" />}
+                <span className={task.done ? 'text-slate-500 line-through' : 'text-slate-200'}>{task.title}</span>
+              </li>
+            ))}
+            {!today.tasks?.length && <li className="text-sm text-slate-500">Задач пока нет</li>}
+          </ul>
+        </Card>
+
+        {prs.length ? (
+          <Card>
+            <CardTitle icon={Trophy} color="text-amber-400" right={<a href="#/sport" className="text-xs text-sky-400 hover:underline">Спорт →</a>}>Личные рекорды</CardTitle>
+            <div className="grid grid-cols-2 gap-2">
+              {prs.map(({ ex, best, first }) => (
+                <div key={ex.id} className="rounded-xl bg-gradient-to-br from-amber-400/10 to-transparent border border-amber-400/10 p-3">
+                  <div className="text-xs text-slate-400 truncate">{ex.name}</div>
+                  <div className="text-xl font-semibold text-white tabular-nums mt-0.5">{fmtNum(best, 1)} <span className="text-xs text-slate-400 font-normal">{ex.unit}</span></div>
+                  <div className="mt-1"><Delta value={best - first} unit={` ${ex.unit}`} /></div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        ) : (
+          <Card>
+            <CardTitle icon={Goal} color="text-emerald-400" right={<a href="#/goals" className="text-xs text-sky-400 hover:underline">Цели →</a>}>Цель по весу</CardTitle>
+            {g ? (
+              <div>
+                <div className="flex items-baseline justify-between gap-2">
+                  <div>{g.label
+                    ? <><span className="text-2xl font-semibold text-white tabular-nums">{g.label}</span><span className="text-sm text-slate-400"> · до ~{fmtNum(g.goal, 1)} кг</span></>
+                    : <><span className="text-2xl font-semibold text-white tabular-nums">{fmtNum(g.goal, 1)}</span><span className="text-sm text-slate-400"> кг</span></>}</div>
+                  <span className="text-sm font-semibold text-emerald-300 tabular-nums">{Math.round(g.progress)}%</span>
+                </div>
+                <Bar value={g.progress} color="from-emerald-400 to-teal-300" className="h-2.5 mt-3" />
+                <div className="flex justify-between text-[11px] text-slate-500 mt-1 tabular-nums">
+                  <span>старт {fmtNum(g.start, 1)}</span><span className="text-slate-300">сейчас {fmtNum(g.current, 1)}</span><span>цель {fmtNum(g.goal, 1)}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 mt-4 text-center">
+                  <div className="rounded-xl bg-white/[.03] py-2"><div className="text-lg font-semibold text-white tabular-nums">{fmtNum(Math.max(0, g.done), 1)}</div><div className="text-[10px] text-slate-500">сброшено, кг</div></div>
+                  <div className="rounded-xl bg-white/[.03] py-2"><div className="text-lg font-semibold text-white tabular-nums">{fmtNum(Math.max(0, g.left), 1)}</div><div className="text-[10px] text-slate-500">осталось, кг</div></div>
+                  <div className="rounded-xl bg-white/[.03] py-2"><div className="text-lg font-semibold text-white tabular-nums">{g.daysLeft ?? '—'}</div><div className="text-[10px] text-slate-500">дней до {g.date ? fmtShort(g.date) : 'цели'}</div></div>
+                </div>
+                {g.perWeek != null && g.left > 0 && <div className="text-xs text-slate-400 mt-3">Нужный темп ≈ {fmtNum(g.perWeek, 1)} кг/нед · калории {kcalTarget ? `${fmtNum(kcalTarget)} ккал/день` : '—'}</div>}
+              </div>
+            ) : <Empty>Цель по весу не задана</Empty>}
+          </Card>
+        )}
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-3 md:gap-4">
+        <Card>
+          <CardTitle icon={TrendingDown} right={<span className="text-xs text-slate-500">{g ? `цель ${g.label ? `${g.label} (~${fmtNum(g.goal, 1)} кг)` : `${fmtNum(g.goal, 1)} кг`}${g.date ? ` к ${fmtShort(g.date)}` : ''}` : 'цель не задана'}</span>}>Динамика веса</CardTitle>
+          <div className="h-48">
+            {weightSeries.length || g ? (
+              <ResponsiveContainer><ComposedChart data={weightChart} margin={{ left: -20, right: 8, top: 8 }}>
+                <defs><linearGradient id="wg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#38bdf8" stopOpacity=".35" /><stop offset="100%" stopColor="#38bdf8" stopOpacity="0" /></linearGradient></defs>
+                <XAxis dataKey="label" tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={24} />
+                <YAxis domain={[(m) => Math.floor(Math.min(m, g?.goal ?? m) - 1), (m) => Math.ceil(Math.max(m, g?.start ?? m) + 1)]} allowDecimals={false} tickLine={false} axisLine={false} />
+                <Tooltip content={<ChartTooltip unit=" кг" names={{ weight: 'Вес', plan: 'План' }} />} />
+                {g && <ReferenceLine y={g.goal} stroke="#34d399" strokeDasharray="4 4" label={{ value: 'цель', fill: '#34d399', fontSize: 10, position: 'insideBottomRight' }} />}
+                {g && <Line dataKey="plan" stroke="#64748b" strokeWidth={1.5} strokeDasharray="5 5" dot={false} activeDot={false} isAnimationActive={false} />}
+                <Area dataKey="weight" stroke="#38bdf8" strokeWidth={2.5} fill="url(#wg2)" connectNulls dot={{ r: 3.5, fill: '#38bdf8', strokeWidth: 0 }} isAnimationActive={false} />
+              </ComposedChart></ResponsiveContainer>
+            ) : <Empty>Взвешиваний пока нет</Empty>}
+          </div>
+          <div className="text-[11px] text-slate-500 mt-1">{weightSeries.length < 2 ? 'Пока один замер — линия появится после следующих взвешиваний. ' : ''}{g ? 'Пунктир — план снижения до цели.' : ''}</div>
+        </Card>
+        <Card>
+          <CardTitle icon={Utensils} color="text-orange-400" right={<span className="text-xs text-slate-500">последние 7 дней</span>}>Калории vs цель</CardTitle>
+          <div className="h-48">
+            {hasKcal ? (
+              <ResponsiveContainer><BarChart data={kcalSeries} margin={{ left: -12, right: 8, top: 8 }}>
+                <XAxis dataKey="label" tickLine={false} axisLine={false} />
+                <YAxis tickLine={false} axisLine={false} domain={[0, (max) => Math.max(500, Math.ceil(Math.max(max, kcalTarget || 0) * 1.1 / 500) * 500)]} />
+                <Tooltip cursor={{ fill: 'rgba(255,255,255,.04)' }} content={<ChartTooltip unit=" ккал" names={{ kcal: 'Калории' }} />} />
+                {kcalTarget && <ReferenceLine y={kcalTarget} stroke="#fb923c" strokeDasharray="4 4" />}
+                <RBar dataKey="kcal" radius={[6, 6, 0, 0]} maxBarSize={36}>
+                  {kcalSeries.map((d, i) => <Cell key={i} fill={kcalTarget && d.kcal > kcalTarget * 1.05 ? '#fb7185' : '#fb923c'} fillOpacity={0.85} />)}
+                </RBar>
+              </BarChart></ResponsiveContainer>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-center gap-1">
+                <Utensils className="text-slate-600" size={28} />
+                <div className="text-sm text-slate-400">Питание пока не записано</div>
+                <div className="text-xs text-slate-500">{kcalTarget ? `цель ${fmtNum(kcalTarget)} ккал/день` : 'цель не задана'}{targets.maintenanceCalories ? ` · поддержание ≈ ${fmtNum(targets.maintenanceCalories)}` : ''}</div>
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
