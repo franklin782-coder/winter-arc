@@ -1,9 +1,10 @@
 import React, { useEffect, useRef } from 'react';
-import { Flame, Trophy, CalendarDays } from 'lucide-react';
-import { Card, CardTitle, SectionHeader, Stat, Bar, Empty } from '../components/ui.jsx';
-import { habitStreak, habitBestStreak, fmtShort, weekday, parse, habitDone, habitFrac } from '../lib.js';
+import { Flame, Trophy, CalendarDays, CheckCircle2, Circle } from 'lucide-react';
+import { Card, CardTitle, SectionHeader, Stat, Bar, Empty, FillCircle } from '../components/ui.jsx';
+import MonthCalendar from '../components/MonthCalendar.jsx';
+import { habitStreak, habitBestStreak, fmtShort, weekday, parse, habitDone, habitFrac, habitDayCell, perfectDaysStreak, monthDates, addDays } from '../lib.js';
 
-export default function Habits({ data, model }) {
+export default function Habits({ data, model, onToggleHabit }) {
   const { habits } = data;
   const scroller = useRef(null);
   // На узком экране прокручиваем карту так, чтобы был виден сегодняшний день
@@ -38,6 +39,57 @@ export default function Habits({ data, model }) {
         <Stat label="Рекорд серии" value={Math.max(0, ...stats.map((s) => s.best))} unit="дн." icon={Trophy} accent="text-amber-400" />
         <Stat label="Отметок всего" value={stats.reduce((s, x) => s + x.done, 0)} sub={`за ${model.elapsed.length} дн.`} icon={CalendarDays} accent="text-orange-400" />
       </div>
+
+      <Card className="mb-4">
+        <CardTitle icon={Flame} color="text-orange-400" right={<span className="text-xs text-slate-500">нажмите, чтобы отметить</span>}>Сегодня</CardTitle>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {habits.map((h) => {
+            const v = todayHabits[h.id];
+            const done = habitDone(h, v);
+            const count = Number(v) || 0;
+            return (
+              <button key={h.id} type="button" onClick={() => onToggleHabit?.(h)}
+                aria-pressed={done}
+                className={`min-h-[48px] flex items-center gap-3 rounded-xl px-3 py-2 text-left touch-manipulation active:scale-[.99] ${done ? 'bg-emerald-500/10' : 'bg-white/[.03]'}`}>
+                {done ? <CheckCircle2 size={22} className="text-emerald-400 shrink-0" /> : <Circle size={22} className="text-slate-500 shrink-0" />}
+                <span className="text-lg leading-none shrink-0">{h.emoji}</span>
+                <span className="flex-1 min-w-0 text-sm text-slate-100 truncate">{h.name}</span>
+                {h.target ? <span className="text-sm font-semibold tabular-nums text-orange-200">{count}/{h.target}</span> : null}
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+
+      <Card className="mb-4">
+        <CardTitle icon={CalendarDays} color="text-orange-400">Календарь месяца</CardTitle>
+        <MonthCalendar
+          today={model.today}
+          minMonth={data.meta.startDate.slice(0, 7)}
+          maxMonth={addDays(data.meta.startDate, data.meta.durationDays - 1).slice(0, 7)}
+          getCell={(iso) => habitDayCell(model.get(iso), habits, iso, model.today)}
+          summary={(month) => {
+            let full = 0, partial = 0;
+            for (const d of monthDates(month)) {
+              if (d > model.today) continue;
+              const tone = habitDayCell(model.get(d), habits, d, model.today).tone;
+              if (tone === 'good') full++;
+              else if (tone === 'mid') partial++;
+            }
+            return [
+              { label: 'Полностью', value: full, accent: 'text-emerald-300' },
+              { label: 'Частично', value: partial, accent: 'text-amber-300' },
+              { label: 'Серия', value: `${perfectDaysStreak(data, model)} дн.` },
+            ];
+          }}
+          legend={[
+            { tone: 'good', label: 'все привычки' },
+            { tone: 'mid', label: 'частично' },
+            { tone: 'bad', label: 'записано, мимо' },
+            { tone: 'empty', label: 'нет записи' },
+          ]}
+        />
+      </Card>
 
       <Card className="mb-4">
         <CardTitle icon={CalendarDays} color="text-orange-400" right={<span className="text-xs text-slate-500 hidden sm:block">{dates.length} дней арки</span>}>Карта привычек</CardTitle>
@@ -82,8 +134,14 @@ export default function Habits({ data, model }) {
         {stats.map(({ h, done, rate, streak, best }) => (
           <Card key={h.id}>
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-xl bg-white/[.05] flex items-center justify-center text-2xl">{h.emoji}</div>
+              <FillCircle value={rate} size={46} color="#fb923c"><span className="text-lg leading-none">{h.emoji}</span></FillCircle>
               <div className="flex-1 min-w-0"><div className="text-white font-medium truncate">{h.name}</div>{h.note && <div className="text-xs text-slate-500 truncate">{h.note}</div>}<div className="text-xs text-slate-400">{done} из {model.elapsed.length} {model.elapsed.length === 1 ? 'дня' : 'дней'}{h.target ? ` · сегодня ${Number(todayHabits[h.id]) || 0}/${h.target}` : ` · сегодня ${habitDone(h, todayHabits[h.id]) ? '✓' : '—'}`}</div></div>
+              <button type="button" onClick={() => onToggleHabit?.(h)} aria-pressed={habitDone(h, todayHabits[h.id])}
+                className="shrink-0 min-h-[44px] min-w-[44px] rounded-xl bg-white/[.04] px-2 flex items-center justify-center touch-manipulation">
+                {h.target
+                  ? <span className="text-sm font-semibold tabular-nums text-orange-200">{Number(todayHabits[h.id]) || 0}/{h.target}</span>
+                  : habitDone(h, todayHabits[h.id]) ? <CheckCircle2 size={22} className="text-emerald-400" /> : <Circle size={22} className="text-slate-500" />}
+              </button>
               <div className="text-right"><div className="text-2xl font-semibold text-orange-300 tabular-nums">🔥{streak}</div><div className="text-[10px] text-slate-500">рекорд {best}</div></div>
             </div>
             <Bar value={rate} color="from-orange-400 to-rose-500" className="h-1.5 mt-4" />

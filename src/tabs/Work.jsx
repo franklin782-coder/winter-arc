@@ -1,7 +1,7 @@
 import React from 'react';
 import { BarChart, Bar as RBar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell, AreaChart, Area } from 'recharts';
 import { Briefcase, Clock, CalendarDays, TrendingUp, NotebookPen, CheckCircle2 } from 'lucide-react';
-import { Card, CardTitle, SectionHeader, Stat, Bar, ChartTooltip, Empty } from '../components/ui.jsx';
+import { Card, CardTitle, SectionHeader, Stat, Bar, ChartTooltip, Empty, Ring } from '../components/ui.jsx';
 import { fmtNum, fmtShort, fmtLong, arcWeek, pct } from '../lib.js';
 
 export default function Work({ data, model }) {
@@ -27,6 +27,16 @@ export default function Work({ data, model }) {
         <Stat label="За месяц" value={fmtNum(total, 1)} unit="ч" sub={`${worked.length} рабочих дней`} icon={Briefcase} accent="text-emerald-400" />
         <Stat label="В среднем" value={fmtNum(worked.length ? total / worked.length : 0, 1)} unit="ч/день" sub="по рабочим дням" icon={TrendingUp} accent="text-emerald-400" />
       </div>
+      <Card className="mb-4 flex items-center gap-4">
+        <Ring value={pct(h(model.today), tD) || 0} size={72} stroke={7} color="#34d399">
+          <span className="text-sm font-semibold text-white tabular-nums">{tD ? `${Math.round(pct(h(model.today), tD))}%` : '0'}</span>
+        </Ring>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm text-white">Часы сегодня</div>
+          <Bar value={pct(h(model.today), tD) || 0} color="from-emerald-400 to-teal-400" className="h-2 mt-2" />
+          <div className="text-xs text-slate-500 mt-1.5">{h(model.today) ? `${fmtNum(h(model.today), 1)} ч` : 'Записей нет — кольцо на нуле'}{tD ? ` · цель ${tD} ч` : ''}</div>
+        </div>
+      </Card>
       <div className="grid lg:grid-cols-3 gap-3 md:gap-4 mb-4">
         <Card className="lg:col-span-2">
           <CardTitle icon={Clock} color="text-emerald-400" right={<span className="text-xs text-slate-500">пунктир — цель</span>}>Часы по дням</CardTitle>

@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { ComposedChart, Bar as RBar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell, PieChart, Pie } from 'recharts';
 import { Flame, Beef, Droplet, Wheat, Utensils, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 import { Card, CardTitle, SectionHeader, Ring, Bar, ChartTooltip, Empty } from '../components/ui.jsx';
-import { fmtNum, fmtShort, fmtLong, dayNutrition, arcWeek, pct } from '../lib.js';
+import MonthCalendar from '../components/MonthCalendar.jsx';
+import { fmtNum, fmtShort, fmtLong, dayNutrition, arcWeek, pct, addDays, monthDates } from '../lib.js';
 
 const pie0 = (n) => n.protein + n.fat + n.carbs > 0;
 const MACROS = [
@@ -73,6 +74,42 @@ export default function Nutrition({ data, model }) {
           </div>
         </Card>
       </div>
+
+      <Card className="mb-4">
+        <CardTitle icon={CalendarDays} color="text-orange-400">Календарь калорий</CardTitle>
+        {!dates.length && <div className="text-sm text-slate-400 mb-3">Приёмы пищи пока не записаны — дни без записи нейтральные, цифры не подставлены.</div>}
+        <MonthCalendar
+          today={model.today}
+          minMonth={data.meta.startDate.slice(0, 7)}
+          maxMonth={addDays(data.meta.startDate, data.meta.durationDays - 1).slice(0, 7)}
+          getCell={(iso) => {
+            if (iso > model.today) return { tone: 'future' };
+            const x = dayNutrition(model.get(iso));
+            if (!x) return { tone: 'empty' };
+            let tone = 'good';
+            if (kT != null && x.kcal > kT * 1.2) tone = 'bad';
+            else if (kT != null && x.kcal > kT * 1.05) tone = 'mid';
+            const label = x.kcal >= 1000 ? `${(x.kcal / 1000).toLocaleString('ru-RU', { maximumFractionDigits: 1 })}к` : String(Math.round(x.kcal));
+            return { tone, label, title: `${Math.round(x.kcal)} ккал${kT ? ` · цель ${kT}` : ''}` };
+          }}
+          summary={(month) => {
+            const logged = monthDates(month).filter((d) => d <= model.today && dayNutrition(model.get(d)));
+            const overN = logged.filter((d) => kT != null && dayNutrition(model.get(d)).kcal > kT * 1.05).length;
+            const avg = logged.length ? logged.reduce((s, d) => s + dayNutrition(model.get(d)).kcal, 0) / logged.length : null;
+            return [
+              { label: 'В цели', value: logged.length - overN, accent: 'text-emerald-300' },
+              { label: 'Выше', value: overN, accent: 'text-rose-300' },
+              { label: 'Средние', value: avg == null ? '—' : fmtNum(avg) },
+            ];
+          }}
+          legend={[
+            { tone: 'good', label: 'в цели' },
+            { tone: 'mid', label: 'чуть выше' },
+            { tone: 'bad', label: 'перебор' },
+            { tone: 'empty', label: 'нет записи' },
+          ]}
+        />
+      </Card>
 
       <div className="grid lg:grid-cols-3 gap-3 md:gap-4">
         <Card className="lg:col-span-2">

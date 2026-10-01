@@ -107,3 +107,13 @@ export function Segmented({ options, value, onChange }) {
     </div>
   );
 }
+
+export function FillCircle({ value = 0, size = 44, color = '#fb923c', children }) {
+  const v = Math.max(0, Math.min(100, value || 0));
+  return (
+    <div className="relative rounded-full overflow-hidden shrink-0 border border-white/10 bg-white/[.05]" style={{ width: size, height: size }}>
+      <div className="absolute inset-x-0 bottom-0" style={{ height: `${v}%`, background: color }} />
+      <div className="absolute inset-0 flex items-center justify-center">{children}</div>
+    </div>
+  );
+}

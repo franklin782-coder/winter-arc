@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { Dumbbell, Trophy, Scale, Timer, Activity } from 'lucide-react';
-import { Card, CardTitle, SectionHeader, Stat, Delta, ChartTooltip, Segmented, Empty } from '../components/ui.jsx';
-import { fmtNum, fmtShort, fmtLong, exerciseSeries, latestWeight, weightGoal } from '../lib.js';
+import { Card, CardTitle, SectionHeader, Stat, Delta, ChartTooltip, Segmented, Empty, Ring, Bar } from '../components/ui.jsx';
+import MonthCalendar from '../components/MonthCalendar.jsx';
+import { fmtNum, fmtShort, fmtLong, exerciseSeries, latestWeight, weightGoal, addDays, monthDates } from '../lib.js';
 
 const COLORS = ['#38bdf8', '#a78bfa', '#34d399', '#fb923c', '#f472b6'];
 
@@ -65,6 +66,15 @@ export default function Sport({ data, model }) {
         ) : null}
         <Card>
           <CardTitle icon={Scale} right={<span className="text-xs text-slate-500">{goalW != null ? `цель ${goalW} кг` : 'цель не задана'}</span>}>Вес</CardTitle>
+          <div className="flex items-center gap-3 mb-3">
+            <Ring value={g?.progress || 0} size={64} stroke={7} color="#34d399">
+              <span className="text-xs font-semibold text-white tabular-nums">{Math.round(g?.progress || 0)}%</span>
+            </Ring>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs text-slate-400">{g ? `до ${fmtNum(g.goal, 1)} кг · осталось ${fmtNum(Math.max(0, g.left), 1)}` : 'цель не задана'}</div>
+              <Bar value={g?.progress || 0} color="from-emerald-400 to-teal-300" className="h-2 mt-2" />
+            </div>
+          </div>
           <div className="h-60">
             {!weightSeries.length ? <Empty>Взвешиваний пока нет</Empty> : <ResponsiveContainer><AreaChart data={weightSeries} margin={{ left: -20, right: 8, top: 8 }}>
               <defs><linearGradient id="sw" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#818cf8" stopOpacity=".35" /><stop offset="100%" stopColor="#818cf8" stopOpacity="0" /></linearGradient></defs>
@@ -79,12 +89,38 @@ export default function Sport({ data, model }) {
         </Card>
       </div>
 
+      <Card className="mb-4">
+        <CardTitle icon={Dumbbell}>Календарь тренировок</CardTitle>
+        {!workouts.length && <div className="text-sm text-slate-400 mb-3">Тренировок пока нет — клетки пустые, цифры не подставлены.</div>}
+        <MonthCalendar
+          today={model.today}
+          minMonth={data.meta.startDate.slice(0, 7)}
+          maxMonth={addDays(data.meta.startDate, data.meta.durationDays - 1).slice(0, 7)}
+          getCell={(iso) => {
+            if (iso > model.today) return { tone: 'future' };
+            const wkd = model.get(iso)?.workout;
+            if (!wkd) return { tone: 'empty' };
+            return { tone: 'good', label: wkd.durationMin ? `${wkd.durationMin}м` : '✓', title: wkd.type || 'Тренировка' };
+          }}
+          summary={(month) => {
+            const days = monthDates(month).filter((d) => d <= model.today && model.get(d)?.workout);
+            const mins = days.reduce((s, d) => s + (model.get(d).workout.durationMin || 0), 0);
+            return [
+              { label: 'Тренировок', value: days.length, accent: 'text-sky-300' },
+              { label: 'Минут', value: mins },
+              { label: 'Без зала', value: monthDates(month).filter((d) => d <= model.today && !model.get(d)?.workout).length },
+            ];
+          }}
+          legend={[{ tone: 'good', label: 'тренировка' }, { tone: 'empty', label: 'нет записи' }]}
+        />
+      </Card>
+
       <Card>
         <CardTitle icon={Dumbbell}>Журнал тренировок</CardTitle>
         {!workouts.length && (
-          <div className="py-8 text-center">
-            <Dumbbell className="mx-auto text-slate-600" size={28} />
-            <div className="text-sm text-slate-400 mt-2">Тренировок и упражнений пока нет</div>
+          <div className="py-6 flex flex-col items-center text-center">
+            <Ring value={0} size={72} stroke={7} color="#38bdf8"><span className="text-sm font-semibold text-slate-300">0</span></Ring>
+            <div className="text-sm text-slate-400 mt-3">Тренировок и упражнений пока нет</div>
             <div className="text-xs text-slate-500 mt-1">Ежедневная активность отмечается во вкладке «Привычки»</div>
           </div>
         )}

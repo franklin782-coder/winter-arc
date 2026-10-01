@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { LayoutDashboard, Target, ListChecks, Flame, Briefcase, Dumbbell, Apple, Snowflake } from 'lucide-react';
-import { buildModel, fmtLong } from './lib.js';
+import { LayoutDashboard, Target, ListChecks, Flame, Briefcase, Dumbbell, Apple, Snowflake, Wallet } from 'lucide-react';
+import { buildModel, fmtLong, readHabitTaps, applyHabitTaps, nextHabitValue, writeHabitTap } from './lib.js';
 import Overview from './tabs/Overview.jsx';
 import Goals from './tabs/Goals.jsx';
 import Tasks from './tabs/Tasks.jsx';
@@ -8,6 +8,7 @@ import Habits from './tabs/Habits.jsx';
 import Work from './tabs/Work.jsx';
 import Sport from './tabs/Sport.jsx';
 import Nutrition from './tabs/Nutrition.jsx';
+import Finance from './tabs/Finance.jsx';
 
 const TABS = [
   { id: 'overview', label: 'Обзор', icon: LayoutDashboard, C: Overview },
@@ -17,6 +18,7 @@ const TABS = [
   { id: 'work', label: 'Работа', icon: Briefcase, C: Work },
   { id: 'sport', label: 'Спорт', icon: Dumbbell, C: Sport },
   { id: 'nutrition', label: 'Питание', icon: Apple, C: Nutrition },
+  { id: 'finance', label: 'Финансы', icon: Wallet, C: Finance },
 ];
 
 const tabFromHash = () => {
@@ -28,6 +30,7 @@ export default function App() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState(tabFromHash());
+  const [habitTaps, setHabitTaps] = useState(readHabitTaps);
 
   useEffect(() => {
     fetch(`./data/data.json?v=${Date.now()}`, { cache: 'no-store' })
@@ -42,8 +45,14 @@ export default function App() {
   if (error) return <div className="p-8 text-rose-300">Не удалось загрузить data/data.json: {error}</div>;
   if (!data) return <div className="min-h-screen flex items-center justify-center text-slate-400"><Snowflake className="animate-spin mr-2" size={18} /> Загрузка…</div>;
 
-  const model = buildModel(data);
-  const { meta } = data;
+  const view = applyHabitTaps(data, habitTaps);
+  const model = buildModel(view);
+  const { meta } = view;
+  const onToggleHabit = (habit) => {
+    const today = model.today;
+    const current = model.get(today)?.habits?.[habit.id];
+    setHabitTaps(writeHabitTap(today, habit.id, nextHabitValue(habit, current)));
+  };
   const Active = TABS.find((t) => t.id === tab).C;
   const dayLabel = model.dayNum < 1 ? `Старт через ${1 - model.dayNum} дн.` : model.dayNum > meta.durationDays ? `Арка завершена` : `День ${model.dayNum} из ${meta.durationDays}`;
 
@@ -76,7 +85,7 @@ export default function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 pt-5 md:pt-8">
-        <Active data={data} model={model} />
+        <Active data={view} model={model} onToggleHabit={onToggleHabit} />
         <footer className="mt-10 text-center text-xs text-slate-600">
           Обновлено: {meta.lastUpdated ? new Date(meta.lastUpdated).toLocaleString('ru-RU', { timeZone: 'Asia/Almaty', dateStyle: 'medium', timeStyle: 'short' }) : '—'} · Winter Arc ❄️
         </footer>
@@ -84,10 +93,10 @@ export default function App() {
 
       {/* Нижняя навигация для телефона */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[#0a101d]/90 backdrop-blur-xl border-t border-white/[.08] pb-[env(safe-area-inset-bottom)]">
-        <div className="grid grid-cols-7">
+        <div className="grid grid-cols-8">
           {TABS.map((t) => (
-            <a key={t.id} href={`#/${t.id}`} className={`flex flex-col items-center gap-0.5 py-2 text-[10px] ${tab === t.id ? 'text-sky-300' : 'text-slate-500'}`}>
-              <t.icon size={20} />
+            <a key={t.id} href={`#/${t.id}`} className={`flex flex-col items-center gap-0.5 py-2 px-0.5 text-[9px] leading-none min-w-0 ${tab === t.id ? 'text-sky-300' : 'text-slate-500'}`}>
+              <t.icon size={18} />
               <span className="truncate max-w-full">{t.label}</span>
             </a>
           ))}

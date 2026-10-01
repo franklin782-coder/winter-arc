@@ -1,8 +1,9 @@
 import React from 'react';
 import { AreaChart, Area, ComposedChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, Bar as RBar, ReferenceLine, Cell } from 'recharts';
-import { Scale, Flame, ListChecks, Briefcase, Trophy, CheckCircle2, Circle, Snowflake, Utensils, TrendingDown, Goal } from 'lucide-react';
+import { Scale, Flame, ListChecks, Briefcase, Trophy, CheckCircle2, Circle, Snowflake, Utensils, TrendingDown, Goal, CalendarDays, Wallet } from 'lucide-react';
 import { Card, CardTitle, Ring, Bar, Delta, ChartTooltip, Empty } from '../components/ui.jsx';
-import { fmtNum, fmtShort, fmtLong, dayNutrition, dayTasks, dayHabits, habitStreak, exerciseSeries, latestWeight, pct, arcWeek, plural, addDays, weekday, diffDays, habitDone, habitFrac, weightGoal } from '../lib.js';
+import MonthCalendar from '../components/MonthCalendar.jsx';
+import { fmtNum, fmtShort, fmtLong, dayNutrition, dayTasks, dayHabits, habitStreak, exerciseSeries, latestWeight, pct, arcWeek, plural, addDays, weekday, diffDays, habitDone, habitFrac, weightGoal, habitDayCell, perfectDaysStreak, monthDates, financeFx, kztToUsd, sumPnlKzt, fmtUsd } from '../lib.js';
 
 function dayScore(day, habits) {
   const t = dayTasks(day).pct, h = dayHabits(day, habits).pct;
@@ -11,7 +12,7 @@ function dayScore(day, habits) {
 }
 const avg = (a) => { const v = a.filter((x) => x != null); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : 0; };
 
-export default function Overview({ data, model }) {
+export default function Overview({ data, model, onToggleHabit }) {
   const { targets, habits, meta } = data;
   const today = model.get(model.today) || {};
   const n = dayNutrition(today);
@@ -93,6 +94,12 @@ export default function Overview({ data, model }) {
             <Delta value={w && prevWeight != null ? w.value - prevWeight : null} unit=" кг за день" invert />
             {targets.startWeight != null && <Delta value={w ? w.value - targets.startWeight : null} unit=" от старта" invert />}
           </div>
+          {g && (
+            <div className="mt-2">
+              <div className="flex justify-between text-[11px] text-slate-500 mb-1"><span>к {fmtNum(g.goal, 1)} кг</span><span className="tabular-nums">{Math.round(g.progress)}%</span></div>
+              <Bar value={g.progress} color="from-emerald-400 to-teal-300" className="h-1.5" />
+            </div>
+          )}
           {weightSeries.length > 1 ? (
             <div className="h-10 mt-2 -mx-1">
               <ResponsiveContainer><AreaChart data={weightSeries}>
@@ -140,6 +147,58 @@ export default function Overview({ data, model }) {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-3 md:gap-4">
+        <Card className="lg:col-span-2">
+          <CardTitle icon={CalendarDays} color="text-orange-400" right={<a href="#/habits" className="text-xs text-sky-400 hover:underline">Привычки →</a>}>Месяц</CardTitle>
+          <MonthCalendar
+            compact
+            today={model.today}
+            minMonth={meta.startDate.slice(0, 7)}
+            maxMonth={addDays(meta.startDate, meta.durationDays - 1).slice(0, 7)}
+            getCell={(iso) => habitDayCell(model.get(iso), habits, iso, model.today)}
+            summary={(month) => {
+              let full = 0, partial = 0;
+              for (const d of monthDates(month)) {
+                if (d > model.today) continue;
+                const tone = habitDayCell(model.get(d), habits, d, model.today).tone;
+                if (tone === 'good') full++;
+                else if (tone === 'mid') partial++;
+              }
+              return [
+                { label: 'Полностью', value: full, accent: 'text-emerald-300' },
+                { label: 'Частично', value: partial, accent: 'text-amber-300' },
+                { label: 'Серия', value: `${perfectDaysStreak(data, model)} дн.` },
+              ];
+            }}
+          />
+        </Card>
+        <Card>
+          <CardTitle icon={Wallet} color="text-emerald-400" right={<a href="#/finance" className="text-xs text-sky-400 hover:underline">Финансы →</a>}>План октября</CardTitle>
+          {(() => {
+            const fx = financeFx(data);
+            const finGoal = (data.goals?.month || []).find((g) => g.auto === 'financeUsd');
+            const ym = finGoal?.month || model.today.slice(0, 7);
+            const snap = sumPnlKzt(data, model, ym);
+            const net = snap.any ? kztToUsd(snap.sum, fx?.kztPerUsd) : 0;
+            const goalUsd = kztToUsd(finGoal?.targetKzt, fx?.kztPerUsd);
+            const p = goalUsd ? Math.max(0, Math.min(100, (net / goalUsd) * 100)) : 0;
+            return (
+              <div className="flex items-center gap-4">
+                <Ring value={p} size={88} stroke={8} color={net < 0 ? '#fb7185' : '#34d399'}>
+                  <span className="text-sm font-semibold text-white tabular-nums">{Math.round(p)}%</span>
+                </Ring>
+                <div className="flex-1 min-w-0">
+                  <div className={`text-xl font-semibold tabular-nums ${net < 0 ? 'text-rose-300' : 'text-white'}`}>{fmtUsd(net)}</div>
+                  <div className="text-xs text-slate-400">из {goalUsd == null ? '—' : fmtUsd(goalUsd)}</div>
+                  <Bar value={p} color="from-emerald-400 to-teal-300" className="h-2 mt-2" />
+                  <div className="text-[11px] text-slate-500 mt-1.5">{snap.any ? 'сумма записанных дней' : 'дневных записей нет'}</div>
+                </div>
+              </div>
+            );
+          })()}
+        </Card>
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-3 md:gap-4">
         {/* Habits streaks */}
         <Card className="lg:col-span-1">
           <CardTitle icon={Flame} color="text-orange-400" right={<span className="text-xs text-slate-500">{dayHabits(today, habits).done}/{habits.length} сегодня</span>}>Привычки и стрики</CardTitle>
@@ -149,7 +208,9 @@ export default function Overview({ data, model }) {
               const done = habitDone(h, v);
               const s = habitStreak(data, model, h.id);
               return (
-                <div key={h.id} className="flex items-center gap-3 rounded-xl px-3 py-2 bg-white/[.03]">
+                <button key={h.id} type="button" onClick={() => onToggleHabit?.(h)} aria-pressed={done}
+                  className={`w-full min-h-[48px] flex items-center gap-3 rounded-xl px-3 py-2 text-left touch-manipulation active:scale-[.99] ${done ? 'bg-emerald-500/10' : 'bg-white/[.03]'}`}>
+                  {done ? <CheckCircle2 size={22} className="text-emerald-400 shrink-0" /> : <Circle size={22} className="text-slate-500 shrink-0" />}
                   <span className="text-lg w-6 text-center">{h.emoji}</span>
                   <span className="flex-1 min-w-0">
                     <span className={`block text-sm truncate ${done ? 'text-slate-100' : 'text-slate-300'}`}>{h.name}</span>
@@ -157,8 +218,7 @@ export default function Overview({ data, model }) {
                   </span>
                   {h.target && <span className="text-xs tabular-nums text-slate-300">{Number(v) || 0}/{h.target}</span>}
                   <span className={`chip ${s >= 3 ? 'bg-orange-500/15 text-orange-300' : 'bg-white/5 text-slate-400'}`}>🔥 {s}</span>
-                  {done ? <CheckCircle2 size={18} className="text-emerald-400" /> : <Circle size={18} className="text-slate-600" />}
-                </div>
+                </button>
               );
             })}
           </div>

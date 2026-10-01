@@ -104,6 +104,12 @@ export function goalCurrent(goal, data, model) {
   if (goal.auto === 'workHours') return model.elapsed.reduce((s, d) => s + (model.get(d)?.work?.hours || 0), 0);
   if (goal.auto === 'workouts') return model.elapsed.filter((d) => model.get(d)?.workout).length;
   if (goal.auto === 'weight') { const w = latestWeight(data, model); return w ? w.value : goal.current; }
+  if (goal.auto === 'financeUsd') {
+    const month = goal.month || (goal.deadline || '').slice(0, 7);
+    const { sum, any } = sumPnlKzt(data, model, month);
+    if (!any) return 0;
+    return kztToUsd(sum, financeFx(data)?.kztPerUsd);
+  }
   return goal.current;
 }
 export function goalProgress(goal, current) {
@@ -137,4 +143,136 @@ export function weightGoal(data, model) {
   const left = current - goalWeight;
   const perWeek = daysLeft ? (left / daysLeft) * 7 : null;
   return { label: goalLabel || null, start: startWeight, goal: goalWeight, current, done, left, progress, date: goalWeightDate, daysLeft, perWeek };
+}
+
+
+export const MONTHS_NOM = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
+export const monthLabel = (ym) => {
+  const [y, m] = ym.split('-').map(Number);
+  const name = MONTHS_NOM[m - 1] || ym;
+  return `${name.charAt(0).toUpperCase()}${name.slice(1)} ${y}`;
+};
+export function monthDates(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  const n = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const out = [];
+  for (let d = 1; d <= n; d++) out.push(iso(new Date(Date.UTC(y, m - 1, d))));
+  return out;
+}
+export function shiftMonth(ym, delta) {
+  const [y, m] = ym.split('-').map(Number);
+  return iso(new Date(Date.UTC(y, m - 1 + delta, 1))).slice(0, 7);
+}
+
+export function fmtUsd(n, digits = 2) {
+  if (n == null || Number.isNaN(Number(n))) return '—';
+  const v = Number(n);
+  const sign = v < 0 ? '−' : '';
+  return `${sign}$${Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
+}
+export function fmtUsdCell(n) {
+  if (n == null || Number.isNaN(Number(n))) return '';
+  const v = Number(n);
+  const sign = v > 0 ? '+' : v < 0 ? '−' : '';
+  const abs = Math.abs(v);
+  const body = abs >= 1000
+    ? `${(abs / 1000).toLocaleString('en-US', { maximumFractionDigits: 1 })}k`
+    : abs >= 100
+      ? abs.toLocaleString('en-US', { maximumFractionDigits: 0 })
+      : abs.toLocaleString('en-US', { maximumFractionDigits: abs < 10 ? 2 : 0 });
+  return `${sign}$${body}`;
+}
+
+export const financeFx = (data) => data.finance?.fx || null;
+export function kztToUsd(kzt, rate) {
+  if (kzt == null || rate == null || !Number(rate)) return null;
+  return Number(kzt) / Number(rate);
+}
+export function goalTarget(goal, data) {
+  if (goal?.auto === 'financeUsd') return kztToUsd(goal.targetKzt, financeFx(data)?.kztPerUsd);
+  return goal?.target;
+}
+
+// Тон дня по привычкам: good — все, mid — частично, bad — день записан, но мимо, empty — записи нет
+export function habitDayCell(day, habits, date, today) {
+  if (date > today) return { tone: 'future' };
+  if (!habits?.length || !day?.habits) return { tone: 'empty' };
+  const total = habits.length;
+  const done = habits.filter((h) => habitDone(h, day.habits[h.id])).length;
+  const frac = habits.reduce((s, h) => s + habitFrac(h, day.habits[h.id]), 0);
+  let tone = 'bad';
+  if (done >= total) tone = 'good';
+  else if (done > 0 || frac > 0) tone = 'mid';
+  return { tone, label: `${done}/${total}`, title: `${done} из ${total} привычек` };
+}
+export function perfectDaysStreak(data, model) {
+  const habits = data.habits || [];
+  const toneOf = (d) => habitDayCell(model.get(d), habits, d, model.today).tone;
+  let d = model.today;
+  if (toneOf(d) !== 'good') d = addDays(d, -1);
+  let n = 0;
+  while (d >= data.meta.startDate && toneOf(d) === 'good') { n++; d = addDays(d, -1); }
+  return n;
+}
+
+// Сумма дневных результатов за месяц. pnlKzt — число, которое записали (плюс прибыль, минус убыток).
+export function sumPnlKzt(data, model, month) {
+  let sum = 0; let any = false; let profit = 0; let loss = 0;
+  for (const date of Object.keys(data.days || {}).sort()) {
+    if (month && !date.startsWith(month)) continue;
+    if (model && date > model.today) continue;
+    const v = data.days[date]?.pnlKzt;
+    if (v == null || v === '') continue;
+    const n = Number(v);
+    if (Number.isNaN(n)) continue;
+    any = true;
+    sum += n;
+    if (n > 0) profit++;
+    else if (n < 0) loss++;
+  }
+  return { sum, any, profit, loss };
+}
+
+const HABIT_TAPS_KEY = 'winter-arc-habit-taps';
+
+export function readHabitTaps() {
+  try {
+    const raw = localStorage.getItem(HABIT_TAPS_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+// Отмеченные сегодня на телефоне перекрывают data.json только по тем ключам, которые нажали.
+export function applyHabitTaps(data, taps) {
+  if (!data) return data;
+  const today = data.meta?.asOf || almatyToday();
+  const dayTaps = taps?.[today];
+  if (!dayTaps || typeof dayTaps !== 'object') return data;
+  const prev = data.days?.[today] || {};
+  return {
+    ...data,
+    days: {
+      ...(data.days || {}),
+      [today]: { ...prev, habits: { ...(prev.habits || {}), ...dayTaps } },
+    },
+  };
+}
+
+export function nextHabitValue(habit, current) {
+  if (habit?.target) {
+    const cap = Number(habit.target) || 0;
+    const n = Math.max(0, Math.min(cap, Number(current) || 0));
+    return (n + 1) % (cap + 1);
+  }
+  return !habitDone(habit, current);
+}
+
+export function writeHabitTap(today, habitId, value) {
+  const all = readHabitTaps();
+  all[today] = { ...(all[today] || {}), [habitId]: value };
+  try { localStorage.setItem(HABIT_TAPS_KEY, JSON.stringify(all)); } catch { /* приватный режим */ }
+  return all;
 }
