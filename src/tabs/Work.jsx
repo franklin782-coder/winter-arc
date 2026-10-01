@@ -2,7 +2,8 @@ import React from 'react';
 import { BarChart, Bar as RBar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell, AreaChart, Area } from 'recharts';
 import { Briefcase, Clock, CalendarDays, TrendingUp, NotebookPen, CheckCircle2 } from 'lucide-react';
 import { Card, CardTitle, SectionHeader, Stat, Bar, ChartTooltip, Empty, Ring } from '../components/ui.jsx';
-import { fmtNum, fmtShort, fmtLong, arcWeek, pct } from '../lib.js';
+import MonthCalendar from '../components/MonthCalendar.jsx';
+import { fmtNum, fmtShort, fmtLong, arcWeek, pct, addDays } from '../lib.js';
 
 export default function Work({ data, model }) {
   const { targets } = data;
@@ -36,6 +37,37 @@ export default function Work({ data, model }) {
           <Bar value={pct(h(model.today), tD) || 0} color="from-emerald-400 to-teal-400" className="h-2 mt-2" />
           <div className="text-xs text-slate-500 mt-1.5">{h(model.today) ? `${fmtNum(h(model.today), 1)} ч` : 'Записей нет — кольцо на нуле'}{tD ? ` · цель ${tD} ч` : ''}</div>
         </div>
+      </Card>
+      <Card className="mb-4">
+        <CardTitle icon={CalendarDays} color="text-emerald-400">Календарь часов</CardTitle>
+        <MonthCalendar
+          today={model.today}
+          minMonth={data.meta.startDate.slice(0, 7)}
+          maxMonth={addDays(data.meta.startDate, data.meta.durationDays - 1).slice(0, 7)}
+          getCell={(iso) => {
+            if (iso > model.today) return { tone: 'future' };
+            const hours = model.get(iso)?.work?.hours;
+            if (hours == null || hours === '') return { tone: 'empty' };
+            const n = Number(hours);
+            if (!n) return { tone: 'empty' };
+            return { tone: 'good', label: `${fmtNum(n, n % 1 ? 1 : 0)}ч`, title: `${fmtNum(n, 1)} часов` };
+          }}
+          summary={() => [
+            { label: 'Сегодня', value: `${fmtNum(h(model.today), 1)} ч` },
+            { label: 'Месяц', value: `${fmtNum(total, 1)} ч` },
+            { label: 'Дней', value: String(worked.length) },
+          ]}
+          legend={[{ tone: 'good', label: 'есть часы' }, { tone: 'empty', label: 'нет записи' }]}
+        />
+      </Card>
+      <Card className="mb-4">
+        <CardTitle icon={CheckCircle2} color="text-emerald-400">На завтра</CardTitle>
+        {(() => {
+          const next = addDays(model.today, 1);
+          const tasks = model.get(next)?.work?.tasks || [];
+          if (!tasks.length) return <Empty>Пока пусто. Скажи вечером, что держать в голове, и я запишу это на следующий день.</Empty>;
+          return <ul className="space-y-2">{tasks.map((t, i) => <li key={i} className="text-sm text-slate-200">{t}</li>)}</ul>;
+        })()}
       </Card>
       <div className="grid lg:grid-cols-3 gap-3 md:gap-4 mb-4">
         <Card className="lg:col-span-2">

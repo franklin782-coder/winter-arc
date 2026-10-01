@@ -58,7 +58,7 @@ export default function Nutrition({ data, model }) {
           <CardTitle icon={Utensils} color="text-orange-400" right={<span className="text-xs text-slate-500">{fmtLong(sel)}</span>}>Приёмы пищи</CardTitle>
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px] gap-4 items-center">
             <div className="space-y-2">
-              {!meals.length && <Empty>Приёмы пищи за этот день не записаны</Empty>}
+              {!meals.length && (n.summary ? <div className="text-sm text-slate-300">Сумма за день, без разбивки по приёмам. БЖУ не считались.</div> : <Empty>Приёмы пищи за этот день не записаны</Empty>)}
               {meals.map((m, i) => (
                 <div key={i} className="flex items-center gap-3 rounded-xl bg-white/[.03] px-3 py-2.5">
                   <div className="w-16 shrink-0 text-xs text-orange-300/90">{m.type}</div>

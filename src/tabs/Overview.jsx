@@ -3,7 +3,7 @@ import { AreaChart, Area, ComposedChart, Line, ResponsiveContainer, XAxis, YAxis
 import { Scale, Flame, ListChecks, Briefcase, Trophy, CheckCircle2, Circle, Snowflake, Utensils, TrendingDown, Goal, CalendarDays, Wallet } from 'lucide-react';
 import { Card, CardTitle, Ring, Bar, Delta, ChartTooltip, Empty } from '../components/ui.jsx';
 import MonthCalendar from '../components/MonthCalendar.jsx';
-import { fmtNum, fmtShort, fmtLong, dayNutrition, dayTasks, dayHabits, habitStreak, exerciseSeries, latestWeight, pct, arcWeek, plural, addDays, weekday, diffDays, habitDone, habitFrac, weightGoal, habitDayCell, perfectDaysStreak, monthDates, financeFx, kztToUsd, sumPnlKzt, fmtUsd } from '../lib.js';
+import { fmtNum, fmtShort, fmtLong, dayNutrition, dayTasks, dayHabits, habitStreak, exerciseSeries, latestWeight, pct, arcWeek, plural, addDays, weekday, diffDays, habitDone, habitFrac, weightGoal, habitDayCell, perfectDaysStreak, monthDates, sumPnlUsd, fmtUsd } from '../lib.js';
 
 function dayScore(day, habits) {
   const t = dayTasks(day).pct, h = dayHabits(day, habits).pct;
@@ -174,12 +174,11 @@ export default function Overview({ data, model, onToggleHabit }) {
         <Card>
           <CardTitle icon={Wallet} color="text-emerald-400" right={<a href="#/finance" className="text-xs text-sky-400 hover:underline">Финансы →</a>}>План октября</CardTitle>
           {(() => {
-            const fx = financeFx(data);
             const finGoal = (data.goals?.month || []).find((g) => g.auto === 'financeUsd');
             const ym = finGoal?.month || model.today.slice(0, 7);
-            const snap = sumPnlKzt(data, model, ym);
-            const net = snap.any ? kztToUsd(snap.sum, fx?.kztPerUsd) : 0;
-            const goalUsd = kztToUsd(finGoal?.targetKzt, fx?.kztPerUsd);
+            const snap = sumPnlUsd(data, model, ym);
+            const net = snap.any ? snap.sum : 0;
+            const goalUsd = finGoal?.target ?? null;
             const p = goalUsd ? Math.max(0, Math.min(100, (net / goalUsd) * 100)) : 0;
             return (
               <div className="flex items-center gap-4">
@@ -188,7 +187,7 @@ export default function Overview({ data, model, onToggleHabit }) {
                 </Ring>
                 <div className="flex-1 min-w-0">
                   <div className={`text-xl font-semibold tabular-nums ${net < 0 ? 'text-rose-300' : 'text-white'}`}>{fmtUsd(net)}</div>
-                  <div className="text-xs text-slate-400">из {goalUsd == null ? '—' : fmtUsd(goalUsd)}</div>
+                  <div className="text-xs text-slate-400">из {goalUsd == null ? '—' : fmtUsd(goalUsd, 0)}</div>
                   <Bar value={p} color="from-emerald-400 to-teal-300" className="h-2 mt-2" />
                   <div className="text-[11px] text-slate-500 mt-1.5">{snap.any ? 'сумма записанных дней' : 'дневных записей нет'}</div>
                 </div>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Target, Mountain } from 'lucide-react';
 import { Card, CardTitle, Bar, Ring, SectionHeader, Empty } from '../components/ui.jsx';
-import { fmtNum, fmtUsd, goalCurrent, goalProgress, goalTarget, financeFx, fmtShort, diffDays, pct } from '../lib.js';
+import { fmtNum, fmtUsd, goalCurrent, goalProgress, goalTarget, fmtShort, diffDays, pct } from '../lib.js';
 
 const CAT = {
   'Спорт': { c: 'from-sky-400 to-cyan-300', chip: 'bg-sky-500/15 text-sky-300', hex: '#38bdf8' },
@@ -13,7 +13,6 @@ const cat = (c) => CAT[c] || { c: 'from-slate-400 to-slate-300', chip: 'bg-white
 
 function GoalList({ goals, data, model }) {
   if (!goals?.length) return <Empty>Целей пока нет</Empty>;
-  const fx = financeFx(data);
   const show = (g, n) => (g.auto === 'financeUsd' ? fmtUsd(n) : `${fmtNum(n, 1)} ${g.unit || ''}`.trim());
   return (
     <div className="space-y-4">
@@ -42,7 +41,6 @@ function GoalList({ goals, data, model }) {
                 <span className="truncate">цель {show(g, target)}</span>
               </div>
               {g.deadline && <div className="text-[11px] text-slate-500 mt-0.5">срок: {fmtShort(g.deadline)} · осталось {Math.max(0, diffDays(model.today, g.deadline))} дн.{target != null && cur != null && Math.abs(cur - target) > 1e-9 ? ` · ещё ${g.auto === 'financeUsd' ? fmtUsd(Math.abs(cur - target)) : `${fmtNum(Math.abs(cur - target), 1)} ${g.unit}`}` : ''}</div>}
-              {g.auto === 'financeUsd' && fx && <div className="text-[11px] text-slate-500 mt-0.5">Прогресс в USD. План {fmtNum(g.targetKzt)} ₸, курс НБ РК {fx.date}: {fmtNum(fx.kztPerUsd, 2)} ₸ за $1. Пока нет дневных записей — сейчас $0.00.</div>}
             </div>
           </div>
         );

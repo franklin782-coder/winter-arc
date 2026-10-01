@@ -2,16 +2,14 @@ import React from 'react';
 import { Wallet, TrendingUp, TrendingDown } from 'lucide-react';
 import { Card, CardTitle, SectionHeader, Stat, Ring, Bar } from '../components/ui.jsx';
 import MonthCalendar from '../components/MonthCalendar.jsx';
-import { addDays, financeFx, fmtNum, fmtUsd, fmtUsdCell, kztToUsd, monthDates, sumPnlKzt } from '../lib.js';
+import { addDays, fmtUsd, fmtUsdCell, sumPnlUsd } from '../lib.js';
 
 export default function Finance({ data, model }) {
-  const fx = financeFx(data);
   const goal = (data.goals?.month || []).find((g) => g.auto === 'financeUsd');
   const month = goal?.month || (goal?.deadline || model.today).slice(0, 7);
-  const targetKzt = goal?.targetKzt ?? null;
-  const goalUsd = kztToUsd(targetKzt, fx?.kztPerUsd);
-  const pnl = sumPnlKzt(data, model, month);
-  const netUsd = pnl.any ? kztToUsd(pnl.sum, fx?.kztPerUsd) : 0;
+  const goalUsd = goal?.target ?? null;
+  const pnl = sumPnlUsd(data, model, month);
+  const netUsd = pnl.any ? pnl.sum : 0;
   const progress = goalUsd ? Math.max(0, Math.min(100, (netUsd / goalUsd) * 100)) : 0;
   const arcEnd = addDays(data.meta.startDate, data.meta.durationDays - 1);
   const minMonth = data.meta.startDate.slice(0, 7);
@@ -19,13 +17,13 @@ export default function Finance({ data, model }) {
 
   const cell = (iso) => {
     if (iso > model.today) return { tone: 'future' };
-    const v = model.get(iso)?.pnlKzt;
+    const day = model.get(iso);
+    const v = day?.pnlUsd ?? day?.pnlKzt;
     if (v == null || v === '') return { tone: 'empty' };
     const n = Number(v);
     if (Number.isNaN(n)) return { tone: 'empty' };
-    const usd = kztToUsd(n, fx?.kztPerUsd);
-    if (n > 0) return { tone: 'good', label: fmtUsdCell(usd), title: fmtUsd(usd) };
-    if (n < 0) return { tone: 'bad', label: fmtUsdCell(usd), title: fmtUsd(usd) };
+    if (n > 0) return { tone: 'good', label: fmtUsdCell(n), title: fmtUsd(n) };
+    if (n < 0) return { tone: 'bad', label: fmtUsdCell(n), title: fmtUsd(n) };
     return { tone: 'flat', label: fmtUsdCell(0), title: fmtUsd(0) };
   };
 
@@ -40,7 +38,7 @@ export default function Finance({ data, model }) {
           <div className="flex-1 min-w-0">
             <div className="text-xs text-slate-400">Итог месяца</div>
             <div className={`text-2xl font-semibold tabular-nums ${netUsd < 0 ? 'text-rose-300' : 'text-white'}`}>{fmtUsd(netUsd)}</div>
-            <div className="text-xs text-slate-400 truncate">из {goalUsd == null ? '—' : fmtUsd(goalUsd)}</div>
+            <div className="text-xs text-slate-400 truncate">из {goalUsd == null ? '—' : fmtUsd(goalUsd, 0)}</div>
             <Bar value={progress} color="from-emerald-400 to-teal-300" className="h-2 mt-2" />
             {!pnl.any && <div className="text-[11px] text-slate-500 mt-1.5">Дневных результатов пока нет</div>}
           </div>
@@ -57,12 +55,12 @@ export default function Finance({ data, model }) {
           maxMonth={maxMonth}
           getCell={cell}
           summary={(ym) => {
-            const snap = sumPnlKzt(data, model, ym);
-            const net = snap.any ? kztToUsd(snap.sum, fx?.kztPerUsd) : 0;
+            const snap = sumPnlUsd(data, model, ym);
+            const net = snap.any ? snap.sum : 0;
             const same = ym === month;
             return [
               { label: 'Итог', value: snap.any ? fmtUsd(net) : '$0.00', accent: net < 0 ? 'text-rose-300' : 'text-emerald-300' },
-              { label: 'Цель', value: same && goalUsd != null ? fmtUsd(goalUsd) : '—' },
+              { label: 'Цель', value: same && goalUsd != null ? fmtUsd(goalUsd, 0) : '—' },
               { label: 'Дни +/−', value: `${snap.profit}/${snap.loss}` },
             ];
           }}
@@ -73,8 +71,7 @@ export default function Finance({ data, model }) {
           ]}
         />
         <p className="text-xs text-slate-500 mt-3 leading-relaxed">
-          {fx ? <>Курс НБ РК на {fx.date}: {fmtNum(fx.kztPerUsd, 2)} ₸ за $1. План {fmtNum(targetKzt)} ₸ → {goalUsd == null ? '—' : fmtUsd(goalUsd)}.</> : 'Курс не задан.'}
-          {' '}В день пишется сумма в тенге (<span className="text-slate-400">pnlKzt</span>), на экране она в долларах. Пустые клетки — дни без записи.
+          Цель октября {goalUsd == null ? '—' : fmtUsd(goalUsd, 0)}. Суммы на календаре в долларах. Пустые клетки — дни без записи.
         </p>
       </Card>
     </div>

@@ -30,9 +30,12 @@ export function plural(n, one, few, many) {
 // Сумма КБЖУ за день
 export function dayNutrition(day) {
   const meals = day?.nutrition?.meals || [];
-  const t = { kcal: 0, protein: 0, fat: 0, carbs: 0 };
+  const t = { kcal: 0, protein: 0, fat: 0, carbs: 0, summary: false };
   for (const m of meals) { t.kcal += m.kcal || 0; t.protein += m.protein || 0; t.fat += m.fat || 0; t.carbs += m.carbs || 0; }
-  return meals.length ? t : null;
+  if (meals.length) return t;
+  const kcal = day?.nutrition?.calories;
+  if (kcal == null || kcal === '') return null;
+  return { kcal: Number(kcal), protein: 0, fat: 0, carbs: 0, summary: true };
 }
 export function dayTasks(day) {
   const tasks = day?.tasks || [];
@@ -106,9 +109,8 @@ export function goalCurrent(goal, data, model) {
   if (goal.auto === 'weight') { const w = latestWeight(data, model); return w ? w.value : goal.current; }
   if (goal.auto === 'financeUsd') {
     const month = goal.month || (goal.deadline || '').slice(0, 7);
-    const { sum, any } = sumPnlKzt(data, model, month);
-    if (!any) return 0;
-    return kztToUsd(sum, financeFx(data)?.kztPerUsd);
+    const { sum, any } = sumPnlUsd(data, model, month);
+    return any ? sum : 0;
   }
   return goal.current;
 }
@@ -188,8 +190,8 @@ export function kztToUsd(kzt, rate) {
   if (kzt == null || rate == null || !Number(rate)) return null;
   return Number(kzt) / Number(rate);
 }
-export function goalTarget(goal, data) {
-  if (goal?.auto === 'financeUsd') return kztToUsd(goal.targetKzt, financeFx(data)?.kztPerUsd);
+export function goalTarget(goal) {
+  if (goal?.auto === 'financeUsd') return goal.target ?? goal.targetUsd ?? null;
   return goal?.target;
 }
 
@@ -215,13 +217,14 @@ export function perfectDaysStreak(data, model) {
   return n;
 }
 
-// Сумма дневных результатов за месяц. pnlKzt — число, которое записали (плюс прибыль, минус убыток).
-export function sumPnlKzt(data, model, month) {
+// Сумма дневных результатов за месяц в долларах. pnlUsd — плюс прибыль, минус убыток.
+export function sumPnlUsd(data, model, month) {
   let sum = 0; let any = false; let profit = 0; let loss = 0;
   for (const date of Object.keys(data.days || {}).sort()) {
     if (month && !date.startsWith(month)) continue;
     if (model && date > model.today) continue;
-    const v = data.days[date]?.pnlKzt;
+    const day = data.days[date] || {};
+    const v = day.pnlUsd ?? day.pnlKzt;
     if (v == null || v === '') continue;
     const n = Number(v);
     if (Number.isNaN(n)) continue;
@@ -276,3 +279,5 @@ export function writeHabitTap(today, habitId, value) {
   try { localStorage.setItem(HABIT_TAPS_KEY, JSON.stringify(all)); } catch { /* приватный режим */ }
   return all;
 }
+
+export const sumPnlKzt = sumPnlUsd;

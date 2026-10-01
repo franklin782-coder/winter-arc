@@ -7,7 +7,7 @@
     "durationDays": 30,
     "longTermEndDate": "2027-03-28",
     "timezone": "Asia/Almaty",
-    "lastUpdated": "2026-10-01T18:30:00+05:00"
+    "lastUpdated": "2026-10-01T18:33:00+05:00"
   },
   "profile": {
     "age": 23,
@@ -93,12 +93,12 @@
       },
       {
         "id": "m-earn",
-        "title": "Заработать 1 200 000 ₸ в октябре",
+        "title": "Заработать $1,2 млн в октябре",
         "category": "Финансы",
         "start": 0,
         "current": 0,
-        "targetKzt": 1200000,
-        "unit": "USD",
+        "target": 1200000,
+        "unit": "$",
         "auto": "financeUsd",
         "month": "2026-10",
         "deadline": "2026-10-31"
@@ -108,18 +108,20 @@
   },
   "days": {
     "2026-10-01": {
-      "weight": 105
+      "weight": 105,
+      "work": {
+        "hours": 12,
+        "tasks": []
+      },
+      "nutrition": {
+        "calories": 2500,
+        "note": "завтрак, обед и ужин, сумма"
+      }
     }
   },
   "finance": {
     "displayCurrency": "USD",
-    "fx": {
-      "pair": "USD/KZT",
-      "kztPerUsd": 440.86,
-      "date": "2026-10-01",
-      "source": "Официальный курс Национального банка Республики Казахстан",
-      "sourceUrl": "https://almaty.tv/ru/news/kurs-valyut/kurs-valut-na-1-oktabra-2026-goda"
-    }
+    "monthGoalUsd": 1200000
   },
   "taskList": {
     "month": "2026-10",
