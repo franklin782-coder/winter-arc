@@ -7,7 +7,7 @@
     "durationDays": 30,
     "longTermEndDate": "2027-03-28",
     "timezone": "Asia/Almaty",
-    "lastUpdated": "2026-09-28T23:55:00+05:00"
+    "lastUpdated": "2026-10-01T18:14:00+05:00"
   },
   "profile": {
     "age": 23,
@@ -39,6 +39,42 @@
       "emoji": "🚶",
       "target": 4,
       "note": "10 минут активности, 4 раза в день"
+    },
+    {
+      "id": "omega3",
+      "name": "Омега-3",
+      "emoji": "🐟",
+      "note": "каждый день"
+    },
+    {
+      "id": "vitc",
+      "name": "Витамин C",
+      "emoji": "🍊",
+      "note": "каждый день"
+    },
+    {
+      "id": "zinc",
+      "name": "Цинк",
+      "emoji": "⚪",
+      "note": "каждый день"
+    },
+    {
+      "id": "d3",
+      "name": "Витамин D3",
+      "emoji": "☀️",
+      "note": "каждый день"
+    },
+    {
+      "id": "magnesium",
+      "name": "Магний",
+      "emoji": "🌙",
+      "note": "каждый день"
+    },
+    {
+      "id": "collagen",
+      "name": "Коллаген",
+      "emoji": "💪",
+      "note": "каждый день"
     }
   ],
   "exercises": [],
