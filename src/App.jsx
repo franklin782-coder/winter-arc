@@ -73,9 +73,13 @@ export default function App() {
       <header className="sticky top-0 z-30 backdrop-blur-xl bg-[#070b14]/75 border-b border-white/[.06]">
         <div className="max-w-7xl mx-auto px-4 h-14 md:h-16 flex items-center gap-4">
           <a href="#/overview" className="flex items-center gap-2 shrink-0">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-500 flex items-center justify-center shadow-lg shadow-sky-500/20">
-              <Snowflake size={18} className="text-white" />
-            </div>
+            <img
+              src={`${import.meta.env.BASE_URL}logo.png`}
+              alt=""
+              width={36}
+              height={36}
+              className="w-9 h-9 rounded-xl object-cover shadow-lg shadow-black/30"
+            />
             <div className="leading-tight">
               <div className="font-semibold text-white tracking-tight">{meta.title}</div>
               <div className="text-[11px] text-slate-400 -mt-0.5">{dayLabel}</div>
