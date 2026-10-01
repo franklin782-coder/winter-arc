@@ -21,3 +21,70 @@ body {
 .recharts-text { fill: #64748b; font-size: 11px; }
 /* Не даём элементам сетки распирать страницу на телефоне */
 .grid > * { min-width: 0; }
+
+/* Приветствие: полноэкранный оверлей, без горизонтального скролла на ~390px */
+.intro-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1.25rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
+  background: #070b14;
+  background-image:
+    radial-gradient(900px 500px at 10% -10%, rgba(56,189,248,.12), transparent 60%),
+    radial-gradient(800px 500px at 100% 0%, rgba(129,140,248,.12), transparent 60%);
+  opacity: 1;
+  transition: opacity 0.42s ease;
+}
+.intro-overlay--out { opacity: 0; pointer-events: none; }
+.intro-copy {
+  text-align: center;
+  animation: intro-rise 0.55s ease 0.15s both;
+}
+.intro-figure {
+  width: min(240px, 78vw);
+  max-height: min(52vh, 320px);
+  animation: intro-slide 0.7s cubic-bezier(.2,.75,.2,1) both;
+}
+.intro-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.intro-wave {
+  transform-box: fill-box;
+  transform-origin: 92% 100%;
+  animation: intro-wave 1.15s ease-in-out 0.55s 1 both;
+}
+.intro-skip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(1.1rem + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  padding: 0.55rem 1rem;
+  min-height: 44px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.04);
+  color: #cbd5e1;
+  font-size: 0.875rem;
+  line-height: 1;
+}
+@keyframes intro-slide {
+  from { transform: translate3d(-40px, 10px, 0); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes intro-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes intro-wave {
+  0% { transform: rotate(0deg); }
+  38% { transform: rotate(-22deg); }
+  68% { transform: rotate(8deg); }
+  100% { transform: rotate(0deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .intro-overlay { display: none; }
+}

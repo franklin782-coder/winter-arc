@@ -9,6 +9,7 @@ import Work from './tabs/Work.jsx';
 import Sport from './tabs/Sport.jsx';
 import Nutrition from './tabs/Nutrition.jsx';
 import Finance from './tabs/Finance.jsx';
+import Intro from './components/Intro.jsx';
 
 const TABS = [
   { id: 'overview', label: 'Обзор', icon: LayoutDashboard, C: Overview },
@@ -31,6 +32,16 @@ export default function App() {
   const [error, setError] = useState(null);
   const [tab, setTab] = useState(tabFromHash());
   const [habitTaps, setHabitTaps] = useState(readHabitTaps);
+  const [showIntro, setShowIntro] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      if (sessionStorage.getItem('winter-arc-intro')) return;
+      sessionStorage.setItem('winter-arc-intro', '1');
+      setShowIntro(true);
+    } catch { /* приватный режим — без заставки */ }
+  }, []);
 
   useEffect(() => {
     fetch(`./data/data.json?v=${Date.now()}`, { cache: 'no-store' })
@@ -58,6 +69,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen pb-24 md:pb-10">
+      {showIntro && <Intro dayLabel={dayLabel} onClose={() => setShowIntro(false)} />}
       <header className="sticky top-0 z-30 backdrop-blur-xl bg-[#070b14]/75 border-b border-white/[.06]">
         <div className="max-w-7xl mx-auto px-4 h-14 md:h-16 flex items-center gap-4">
           <a href="#/overview" className="flex items-center gap-2 shrink-0">
