@@ -3,6 +3,7 @@ import { Wallet, TrendingUp, TrendingDown } from 'lucide-react';
 import { Card, CardTitle, SectionHeader, Stat, Ring, Bar } from '../components/ui.jsx';
 import MonthCalendar from '../components/MonthCalendar.jsx';
 import { addDays, fmtUsd, fmtUsdCell, sumPnlUsd } from '../lib.js';
+import Expenses from '../components/Expenses.jsx';
 
 export default function Finance({ data, model }) {
   const goal = (data.goals?.month || []).find((g) => g.auto === 'financeUsd');
@@ -74,6 +75,8 @@ export default function Finance({ data, model }) {
           Цель октября {goalUsd == null ? '—' : fmtUsd(goalUsd, 0)}. Суммы на календаре в долларах. Пустые клетки — дни без записи.
         </p>
       </Card>
+
+      <Expenses data={data} today={model.today} />
     </div>
   );
 }

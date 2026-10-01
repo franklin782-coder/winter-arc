@@ -281,3 +281,170 @@ export function writeHabitTap(today, habitId, value) {
 }
 
 export const sumPnlKzt = sumPnlUsd;
+
+const EXPENSES_KEY = 'winter-arc-expenses';
+
+// Категории трат. Депозит — отложенные деньги, не расход.
+export const EXPENSE_CATEGORIES = [
+  { id: 'food', label: 'Еда', color: '#fb923c', keys: ['food', 'cafe', 'кафе', 'grocery', 'еда', 'обед', 'кофе', 'продукты'] },
+  { id: 'transport', label: 'Транспорт', color: '#38bdf8', keys: ['такси', 'бензин', 'метро', 'автобус'] },
+  { id: 'home', label: 'Жильё', color: '#a78bfa', keys: ['аренда', 'квартира', 'коммуналка', 'свет', 'интернет'] },
+  { id: 'clothes', label: 'Одежда', color: '#f472b6', keys: ['одежда', 'одежд', 'обув', 'кроссов', 'футболк', 'куртк', 'джинс'] },
+  { id: 'health', label: 'Здоровье', color: '#34d399', keys: ['аптека', 'врач', 'стоматолог', 'чекап'] },
+  { id: 'fun', label: 'Развлечения', color: '#facc15', keys: ['развлечения', 'развлеч', 'кино', 'концерт'] },
+  { id: 'work', label: 'Работа', color: '#22d3ee', keys: ['работа', 'офис', 'подписка', 'сервер'] },
+  { id: 'deposit', label: 'Депозит', color: '#818cf8', keys: ['savings', 'депозит', 'отложил', 'накопил'] },
+  { id: 'other', label: 'Другое', color: '#94a3b8', keys: [] },
+];
+
+const normNote = (s) => String(s || '').toLowerCase().replaceAll('ё', 'е');
+
+export function canonicalCategory(raw) {
+  if (raw == null || String(raw).trim() === '') return 'Другое';
+  const s = String(raw).trim();
+  const found = EXPENSE_CATEGORIES.find((c) => c.id === s || c.label.toLowerCase() === s.toLowerCase());
+  return found ? found.label : s;
+}
+
+export const categoryColor = (label) => EXPENSE_CATEGORIES.find((c) => c.label === canonicalCategory(label))?.color || '#94a3b8';
+
+export const isDepositCategory = (category) => {
+  const c = canonicalCategory(category);
+  return c === 'Депозит';
+};
+
+// Самое длинное совпадение побеждает, чтобы «подписка» не проигрывала короткому слову.
+export function guessExpenseCategory(note) {
+  const s = normNote(note);
+  if (!s.trim()) return 'Другое';
+  let best = null;
+  for (const cat of EXPENSE_CATEGORIES) {
+    for (const key of cat.keys) {
+      const k = normNote(key);
+      if (!k || !s.includes(k)) continue;
+      if (!best || k.length > best.len) best = { label: cat.label, len: k.length };
+    }
+  }
+  return best ? best.label : 'Другое';
+}
+
+// Неделя понедельник–воскресенье, в которой лежит дата.
+export function isoWeekRange(date) {
+  const wd = parse(date).getUTCDay();
+  const start = addDays(date, wd === 0 ? -6 : 1 - wd);
+  return { start, end: addDays(start, 6) };
+}
+
+export function fmtKzt(n) {
+  if (n == null || Number.isNaN(Number(n))) return '—';
+  const v = Number(n);
+  const sign = v < 0 ? '−' : '';
+  const body = Math.abs(v).toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+  return `${sign}${body.replace(/[\u00A0\u202F]/g, ' ')} ₸`;
+}
+
+export function readExpenses() {
+  try {
+    const raw = localStorage.getItem(EXPENSES_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((row) => row && row.id != null && row.date && Number.isFinite(Number(row.amountKzt))).map((row) => ({
+      id: String(row.id),
+      date: String(row.date),
+      amountKzt: Number(row.amountKzt),
+      note: row.note ? String(row.note) : '',
+      category: canonicalCategory(row.category),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export function writeExpenses(rows) {
+  const clean = (rows || []).map(({ id, date, amountKzt, note, category }) => ({
+    id: String(id),
+    date: String(date),
+    amountKzt: Number(amountKzt),
+    note: note ? String(note) : '',
+    category: canonicalCategory(category),
+  }));
+  try { localStorage.setItem(EXPENSES_KEY, JSON.stringify(clean)); } catch { /* приватный режим */ }
+  return clean;
+}
+
+// Записи из days[date].expenses плюс телефон. Один и тот же id — побеждает телефон.
+export function mergeExpenses(data, localRows) {
+  const map = new Map();
+  const days = data?.days || {};
+  for (const date of Object.keys(days).sort()) {
+    const list = days[date]?.expenses;
+    if (!Array.isArray(list)) continue;
+    list.forEach((row, i) => {
+      if (!row || typeof row !== 'object') return;
+      const amount = Number(row.amountKzt);
+      if (!Number.isFinite(amount)) return;
+      const id = row.id != null && String(row.id) !== '' ? String(row.id) : `file:${date}:${i}`;
+      map.set(id, {
+        id,
+        date: typeof row.date === 'string' && row.date ? row.date : date,
+        amountKzt: amount,
+        note: row.note ? String(row.note) : '',
+        category: canonicalCategory(row.category),
+        local: false,
+      });
+    });
+  }
+  for (const row of localRows || []) {
+    if (!row || row.id == null || !row.date) continue;
+    const amount = Number(row.amountKzt);
+    if (!Number.isFinite(amount)) continue;
+    const id = String(row.id);
+    map.set(id, {
+      id,
+      date: String(row.date),
+      amountKzt: amount,
+      note: row.note ? String(row.note) : '',
+      category: canonicalCategory(row.category),
+      local: true,
+    });
+  }
+  return [...map.values()];
+}
+
+export function expenseSnapshot(rows, today) {
+  const week = isoWeekRange(today);
+  const month = today.slice(0, 7);
+  const year = today.slice(0, 4);
+  const sum = (pred, deposit) => (rows || []).reduce((s, row) => {
+    const dep = isDepositCategory(row.category);
+    if (deposit ? !dep : dep) return s;
+    if (!row.date || !pred(row.date)) return s;
+    const n = Number(row.amountKzt);
+    if (!Number.isFinite(n)) return s;
+    return s + n;
+  }, 0);
+  return {
+    week: sum((d) => d >= week.start && d <= week.end, false),
+    month: sum((d) => d.startsWith(month), false),
+    year: sum((d) => d.startsWith(year), false),
+    depositMonth: sum((d) => d.startsWith(month), true),
+    depositAll: sum(() => true, true),
+    weekRange: week,
+  };
+}
+
+export function monthSpendSlices(rows, today) {
+  const month = today.slice(0, 7);
+  const totals = new Map();
+  for (const row of rows || []) {
+    if (!row.date || !row.date.startsWith(month) || isDepositCategory(row.category)) continue;
+    const n = Number(row.amountKzt);
+    if (!Number.isFinite(n) || n === 0) continue;
+    const name = canonicalCategory(row.category);
+    totals.set(name, (totals.get(name) || 0) + n);
+  }
+  return [...totals.entries()]
+    .filter(([, value]) => value !== 0)
+    .map(([name, value]) => ({ name, value, fill: categoryColor(name) }))
+    .sort((a, b) => b.value - a.value);
+}
